@@ -174,4 +174,3 @@ Dự án sử dụng bộ dữ liệu [Building Data Genome Project 2](https://g
 * **Backend:** FastAPI, SQLAlchemy
 * **Database:** PostgreSQL
 * **Frontend:** Chart.js, HTML5/CSS3 (CSS Grid/Flexbox)
-```
