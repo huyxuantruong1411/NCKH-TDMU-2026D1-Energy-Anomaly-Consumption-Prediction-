@@ -1,4 +1,3 @@
-```markdown
 # ⚡ Enterprise Energy Anomaly Detection System (EEADS)
 
 An enterprise-grade, real-time energy anomaly detection and management system. Powered by a **Big Data Pipeline** and **Explainable AI (XAI)**, EEADS provides deep analytics, anomaly forecasting, and actionable insights for up to 50 buildings simultaneously.
