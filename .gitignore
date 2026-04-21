@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment variables (Bảo mật)
+.env
+.flaskenv
+
+# Databases
+*.db
+*.sqlite3
+
+# Data files (Vì file dataset của bạn rất nặng, không nên push lên Git)
+simulator/data/*.csv
+backend/data/*.csv
+
+# Logs
+*.log
+logs/
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+*.csv
+*.txt
+
+Dataset/
+
+dump.py
+
+*.pth
+*.h5
+*.json
+*.keras

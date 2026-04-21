@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Energy Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --bg: #f1f5f9; --sidebar: #0f172a; --card: #ffffff; --text: #334155; --text-light: #64748b; --primary: #3b82f6; --danger: #ef4444; --border: #e2e8f0; }
+        * { box-sizing: border-box; }
+        body { margin: 0; display: flex; height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg); color: var(--text); overflow: hidden; }
+        
+        /* SIDEBAR CHUYÊN NGHIỆP */
+        .sidebar { width: 280px; background-color: var(--sidebar); color: white; display: flex; flex-direction: column; z-index: 100; box-shadow: 2px 0 10px rgba(0,0,0,0.1); flex-shrink: 0;}
+        .logo { font-size: 20px; font-weight: 800; padding: 20px; background: #020617; color: #38bdf8; text-align: center; border-bottom: 1px solid #1e293b; letter-spacing: 1px;}
+        .search-box { padding: 15px; border-bottom: 1px solid #1e293b; position: relative; background: #0f172a;}
+        .search-box input { width: 100%; padding: 12px 15px 12px 35px; border-radius: 6px; border: 1px solid #334155; background: #1e293b; color: white; outline: none; font-size: 13px; transition: 0.2s;}
+        .search-box input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);}
+        .search-icon { position: absolute; left: 25px; top: 25px; color: #94a3b8; font-size: 14px;}
+        .building-list { display: flex; flex-direction: column; padding: 10px; overflow-y: auto; flex: 1; }
+        .b-item { padding: 12px 15px; margin-bottom: 4px; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 13px; border-left: 3px solid transparent; color: #cbd5e1;}
+        .b-item:hover { background: #1e293b; color: white; }
+        .b-item.active { background: #1e293b; border-left-color: var(--primary); font-weight: bold; color: white; }
+
+        /* VÙNG CUỘN CHÍNH (Đã FIX Lỗi Sticky bằng Flexbox) */
+        .main-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); position: relative; }
+        
+        /* TOPBAR BÁM TRẦN MÀN HÌNH */
+        .topbar { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; padding: 15px 40px; background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); z-index: 50; box-shadow: 0 2px 4px rgba(0,0,0,0.02);}
+        .header-titles h1 { margin: 0 0 5px 0; font-size: 24px; color: #0f172a; }
+        .subtitle { margin: 0; color: var(--text-light); font-size: 13px; }
+        
+        .actions-area { display: flex; gap: 20px; align-items: center; }
+        .time-controls { display: flex; background: #f1f5f9; padding: 4px; border-radius: 8px; border: 1px solid var(--border);}
+        .btn-time { border: none; background: transparent; padding: 6px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; color: #64748b; cursor: pointer; transition: 0.2s;}
+        .btn-time:hover { color: #0f172a; }
+        .btn-time.active { background: white; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .btn-history { background: #0f172a; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s;}
+        .btn-history:hover { background: var(--primary); }
+        
+        /* QUẢ CHUÔNG & THÔNG BÁO */
+        .bell-wrapper { position: relative; cursor: pointer; background: white; border-radius: 50%; width: 42px; height: 42px; display: flex; justify-content: center; align-items: center; border: 1px solid var(--border); transition: 0.2s;}
+        .bell-wrapper:hover { background: #f8fafc; }
+        .badge { position: absolute; top: -3px; right: -3px; background: var(--danger); color: white; font-size: 11px; font-weight: bold; min-width: 20px; height: 20px; border-radius: 10px; display: flex; justify-content: center; align-items: center; border: 2px solid white; padding: 0 4px;}
+        .badge.hidden { display: none; }
+        @keyframes shake { 0%, 100% {transform: rotate(0deg);} 25% {transform: rotate(15deg);} 75% {transform: rotate(-15deg);} }
+        .ringing { animation: shake 0.5s infinite; color: var(--danger); }
+
+        .alerts-panel { position: absolute; top: 55px; right: 0; width: 350px; background: white; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); border: 1px solid var(--border); display: none; flex-direction: column; max-height: 400px; z-index: 100;}
+        .alerts-panel.show { display: flex; }
+        .alerts-header { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 14px; color: #0f172a;}
+        .btn-clear { background: none; border: none; color: var(--primary); cursor: pointer; font-size: 12px; font-weight: 600;}
+        .alerts-list { overflow-y: auto; }
+        .alert-item { padding: 15px 20px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: 0.2s; border-left: 3px solid var(--danger);}
+        .alert-item:hover { background: #f8fafc; }
+        .alert-title { font-size: 13px; font-weight: bold; color: #0f172a; margin-bottom: 4px; display: flex; justify-content: space-between;}
+        .alert-desc { font-size: 12px; color: var(--text-light); line-height: 1.4;}
+
+        /* NỘI DUNG CUỘN ĐỘC LẬP */
+        .scrollable-content { flex: 1; overflow-y: auto; padding: 25px 40px; }
+
+        /* KPI & CHARTS */
+        .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 25px; }
+        .kpi-card { background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-left: 4px solid #cbd5e1; }
+        .kpi-card.highlight { border-left-color: var(--primary); }
+        .kpi-card h4 { margin: 0 0 8px 0; font-size: 12px; color: var(--text-light); text-transform: uppercase; font-weight: 600; }
+        .kpi-value { font-size: 26px; font-weight: 800; color: #0f172a; }
+
+        .section-title { font-size: 18px; color: #0f172a; margin: 30px 0 15px 0; padding-bottom: 10px; border-bottom: 2px solid #e2e8f0; font-weight: 700;}
+
+        .grid-2-col { display: grid; grid-template-columns: 7fr 3fr; gap: 20px; margin-bottom: 30px;}
+        .grid-3-col { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 40px;}
+
+        .chart-box { background: var(--card); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--border);}
+        .box-header { padding: 15px 20px; border-bottom: 1px solid var(--border); background: #f8fafc; }
+        .box-header h3 { margin: 0; font-size: 14px; color: #0f172a; font-weight: 700; text-transform: uppercase;}
+        .box-desc { font-size: 12px; color: var(--text-light); margin: 4px 0 0 0; }
+        .canvas-wrapper { position: relative; width: 100%; padding: 15px; }
+        
+        /* ACTIONABLE INSIGHTS TEXT */
+        .chart-insight { margin: 0; padding: 15px 20px; font-size: 13px; border-top: 1px solid var(--border); line-height: 1.6; }
+        .insight-blue { background: #eff6ff; color: #1e3a8a; border-top-color: #bfdbfe; }
+        .insight-green { background: #f0fdf4; color: #166534; border-top-color: #bbf7d0; }
+        .insight-red { background: #fef2f2; color: #991b1b; border-top-color: #fecdd3; }
+        .insight-gray { background: #f8fafc; color: #475569; }
+
+        /* XAI PANEL */
+        .xai-panel { display: flex; flex-direction: column; }
+        .xai-content { padding: 20px; font-size: 13px; line-height: 1.5; border-bottom: 1px dashed var(--border);}
+        .xai-empty { text-align: center; color: var(--text-light); font-style: italic; padding: 30px 0; }
+
+        /* MODAL LỊCH SỬ CHUYÊN SÂU */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.7); z-index: 9999; display: none; justify-content: center; align-items: center; backdrop-filter: blur(3px);}
+        .modal-overlay.show { display: flex; }
+        .modal-content { background: white; width: 90%; max-width: 1100px; max-height: 90vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); animation: modalIn 0.3s ease;}
+        @keyframes modalIn { from {opacity: 0; transform: translateY(20px);} to {opacity: 1; transform: translateY(0);} }
+        .modal-header { padding: 20px 25px; background: #0f172a; color: white; display: flex; justify-content: space-between; align-items: center;}
+        .modal-header h2 { margin: 0; font-size: 18px; }
+        .btn-close { background: transparent; border: none; color: white; font-size: 24px; cursor: pointer;}
+        .modal-body { padding: 20px 25px; overflow-y: auto; flex: 1; background: var(--bg);}
+
+        .history-table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05);}
+        .history-table th { background: #f1f5f9; padding: 15px; text-align: left; font-size: 13px; color: var(--text-light); text-transform: uppercase;}
+        .history-table td { padding: 15px; border-bottom: 1px solid var(--border); font-size: 14px; color: #0f172a;}
+        .history-table tr:hover { background: #f8fafc; cursor: pointer; }
+
+        .snapshot-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 25px; }
+        .snap-params { background: white; padding: 20px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,0.05);}
+        .param-item { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px dashed #cbd5e1; font-size: 14px;}
+        .snap-actions { display: flex; flex-direction: column; gap: 15px;}
+        .action-card { background: white; border: 1px solid var(--border); border-left: 5px solid var(--danger); padding: 18px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);}
+        .action-title { font-weight: bold; color: #0f172a; font-size: 15px; margin-bottom: 8px;}
+        .action-advice { font-size: 13px; color: #334155; line-height: 1.6; background: #fef2f2; padding: 12px; border-radius: 6px; margin-top: 10px; border: 1px solid #fecdd3;}
+    </style>
+</head>
+<body>
+    <nav class="sidebar">
+        <div class="logo">⚡ AI ENERGY</div>
+        <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="search-input" placeholder="Tìm tòa nhà...">
+        </div>
+        <div id="building-list" class="building-list"></div>
+    </nav>
+
+    <div class="main-wrapper">
+        <header class="topbar">
+            <div class="header-titles">
+                <h1 id="building-title">Chưa chọn tòa nhà</h1>
+                <p id="time-display" class="subtitle">Đang đồng bộ dữ liệu...</p>
+            </div>
+            
+            <div class="actions-area">
+                <div class="time-controls">
+                    <button class="btn-time" data-val="6">6H</button>
+                    <button class="btn-time" data-val="12">12H</button>
+                    <button class="btn-time active" data-val="24">24H</button>
+                </div>
+                <button class="btn-history" id="btn-show-history">📜 Xem Lịch sử Cảnh báo</button>
+                
+                <div class="bell-wrapper" id="bell-btn">
+                    <span id="bell-icon" style="font-size: 20px;">🔔</span>
+                    <div class="badge hidden" id="alert-badge">0</div>
+                    
+                    <div class="alerts-panel" id="alerts-panel">
+                        <div class="alerts-header">
+                            Sự cố Hệ thống (Live) <button class="btn-clear" id="btn-clear">Xác nhận đã đọc</button>
+                        </div>
+                        <div class="alerts-list" id="alerts-list"></div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="scrollable-content">
+            <section class="kpi-grid">
+                <div class="kpi-card"><h4>Tải Hiện Tại</h4><div class="kpi-value" id="kpi-cur">0.0</div></div>
+                <div class="kpi-card highlight"><h4>Tổng Điện Năng (24h)</h4><div class="kpi-value" id="kpi-sum">0.0</div></div>
+                <div class="kpi-card"><h4>Đỉnh Tải (Max Peak)</h4><div class="kpi-value" id="kpi-max" style="color: var(--danger);">0.0</div></div>
+                <div class="kpi-card"><h4>Tải Nền (Base Load)</h4><div class="kpi-value" id="kpi-min" style="color: var(--primary);">0.0</div></div>
+            </section>
+
+            <h2 class="section-title">📊 GIÁM SÁT VẬN HÀNH & AI ĐIỀU KHIỂN</h2>
+            <div class="grid-2-col">
+                <div class="chart-box">
+                    <div class="box-header">
+                        <h3>Đường cong Phụ tải & Ngưỡng An toàn</h3>
+                        <p class="box-desc">Dải xanh lá (IQR Band) đại diện cho vùng dao động cho phép. Chấm đỏ là dị thường.</p>
+                    </div>
+                    <div class="canvas-wrapper" style="height: 350px;"><canvas id="realtimeChart"></canvas></div>
+                    <p class="chart-insight insight-gray" id="insight-realtime">Đang thu thập và đánh giá xu hướng tải...</p>
+                </div>
+
+                <div class="chart-box xai-panel">
+                    <div class="box-header" style="background: #1e293b; color: white; border-bottom: none;">
+                        <h3 style="color: white;">🧠 HỆ CHUYÊN GIA (XAI) PHÂN TÍCH</h3>
+                        <p class="box-desc" style="color: #94a3b8;">Phân rã nguyên nhân của sự cố gần nhất theo độ đo AI</p>
+                    </div>
+                    <div class="xai-content" id="xai-content">
+                        <div class="xai-empty">Trạng thái hoàn hảo. Không có sự cố nào để phân tích.</div>
+                    </div>
+                    <div class="canvas-wrapper" style="height: 220px;"><canvas id="xaiChart"></canvas></div>
+                </div>
+            </div>
+
+            <h2 class="section-title">🌍 PHÂN TÍCH CHUYÊN SÂU: MÔI TRƯỜNG & LỊCH SỬ</h2>
+            <div class="grid-3-col">
+                <div class="chart-box">
+                    <div class="box-header"><h3>🌡️ Nền Nhiệt & Độ Ẩm Sương</h3><p class="box-desc">Đánh giá áp lực khí hậu lên hệ thống Chiller/HVAC</p></div>
+                    <div class="canvas-wrapper" style="height: 250px;"><canvas id="tempChart"></canvas></div>
+                    <p class="chart-insight insight-gray" id="insight-temp">Đang quét dữ liệu thời tiết vi mô...</p>
+                </div>
+                <div class="chart-box">
+                    <div class="box-header"><h3>🌪️ Khí động học (Gió & Áp suất)</h3><p class="box-desc">Cảnh báo rò rỉ nhiệt và đối lưu công trình</p></div>
+                    <div class="canvas-wrapper" style="height: 250px;"><canvas id="windChart"></canvas></div>
+                    <p class="chart-insight insight-gray" id="insight-wind">Đang phân tích vận tốc gió...</p>
+                </div>
+                <div class="chart-box">
+                    <div class="box-header"><h3>🕒 Hồ Sơ Phụ Tải (Hourly Profile)</h3><p class="box-desc">Phân bố điện năng trung bình theo giờ trong 40 ngày qua</p></div>
+                    <div class="canvas-wrapper" style="height: 250px;"><canvas id="profileChart"></canvas></div>
+                    <p class="chart-insight insight-blue" id="insight-profile">Đang dựng hồ sơ tải...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="history-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Lịch sử Cảnh báo</h2>
+                <button class="btn-close" id="btn-close-modal">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = "http://localhost:8000/api";
+        let currentBuilding = null;
+        let allBuildings = [];
+        let limit = 24; 
+        let notifiedAlerts = new Set();
+        let cRealtime, cXai, cTemp, cWind, cProfile;
+
+        // ================= TỪ ĐIỂN CHUYÊN GIA DỊCH XAI (DICTIONARY) =================
+        const dictFeature = {
+            'airTemperature': { name: 'Nhiệt độ ngoài trời', advice: 'Nhiệt độ môi trường tăng/giảm ép hệ thống HVAC phải bù tải lập tức. Đề nghị kiểm tra lại dải nhiệt cài đặt của Chiller/AHU và kéo rèm che nắng tại các vách kính hướng Tây.' },
+            'dewTemperature': { name: 'Độ ẩm không khí (Điểm sương)', advice: 'Độ ẩm môi trường quá cao làm giảm năng lực trao đổi nhiệt. Cần kích hoạt chế độ Dry, kiểm tra hệ thống tách ẩm và đảm bảo van nước ngưng của dàn lạnh không bị nghẹt.' },
+            'windSpeed': { name: 'Tốc độ gió', advice: 'Gió giật mạnh làm tăng tốc độ thất thoát nhiệt (đối lưu) qua lớp vỏ tòa nhà. Khẩn trương rà soát độ kín của hệ thống cửa tự động và khe hở thông gió.' },
+            'seaLvlPressure': { name: 'Áp suất khí quyển', advice: 'Áp suất tụt giảm đột ngột thường đi kèm với dông bão. Cảnh báo đội an ninh tuần tra hệ thống thoát nước và chuẩn bị kịch bản chạy máy phát điện dự phòng.' },
+            'precipDepth1HR': { name: 'Lượng mưa (1h qua)', advice: 'Mưa lớn làm nhiệt độ bề mặt giảm gắt nhưng đẩy độ ẩm cục bộ lên cao. Hãy theo dõi sát công suất quạt thông gió và cân nhắc giảm tải hệ thống làm mát trung tâm.' },
+            'precipDepth6HR': { name: 'Lượng mưa kéo dài (6h)', advice: 'Tường nhà đã ngấm lạnh và bão hòa nhiệt. Đây là thời điểm vàng để giảm công suất lạnh (Chiller) nhằm tiết kiệm điện năng.' },
+            'cloudCoverage': { name: 'Độ phủ mây', advice: 'Trời u ám làm giảm nhu cầu làm mát (bức xạ nhiệt thấp) nhưng lại gia tăng phụ tải chiếu sáng. Kiểm tra lại lịch trình bật/tắt hệ thống đèn tự động ở hành lang.' },
+            'enthalpy': { name: 'Chỉ số Nhiệt ẩm (Enthalpy)', advice: 'Tổng năng lượng của không khí đang ở mức khắc nghiệt. Hệ thống lạnh đang bị quá tải để vừa khử ẩm vừa hạ nhiệt. Yêu cầu bộ phận Kỹ thuật kiểm tra ngay gas lạnh và màng lọc.' },
+            'load_lag_1': { name: 'Tải đột biến 1 giờ trước', advice: 'Sự cố mang tính dây chuyền. Hãy kiểm tra xem 1 tiếng trước có thiết bị công suất lớn nào (Bơm cấp nước, máy nén) vừa được kích hoạt hoặc bị kẹt động cơ hay không.' },
+            'load_lag_2': { name: 'Dư chấn tải 2 giờ trước', advice: 'Tình trạng ngốn điện bất thường đã âm ỉ duy trì suốt 2 tiếng. Cử kỹ thuật viên đi tuần tra thực tế các tầng ngay lập tức.' },
+            'load_lag_6': { name: 'Lịch sử vận hành 6 giờ trước', advice: 'Kiểm tra lại Log book ca trực trước (khoảng 4 đến 7 giờ trước). Có thể họ đã thay đổi thông số hệ thống hoặc tổ chức sự kiện mà chưa hoàn trả lại hiện trạng.' },
+            'load_lag_24': { name: 'Sai lệch so với cùng giờ Hôm qua', advice: 'Quy luật sinh hoạt bị phá vỡ. Có bộ phận nào tăng ca, hoặc ai đó quên tắt hệ thống đèn/điều hòa qua đêm hay không?' },
+            'load_lag_168': { name: 'Sai lệch so với cùng giờ Tuần trước', advice: 'Hành vi tiêu thụ theo chu kỳ tuần đang biến động. Cần đối chiếu với lịch ngày nghỉ lễ hoặc xem có sự thay đổi lớn về số lượng khách thuê không.' },
+            'load_diff_1': { name: 'Tốc độ giật tải (1 giờ)', advice: 'Tải đang tăng/giảm với gia tốc quá gắt (Sốc tải). Máy nén và động cơ có thể bị quá dòng khởi động. Yêu cầu kiểm tra các bộ biến tần (Inverter).' },
+            'load_ratio_24h': { name: 'Hệ số sử dụng tải (Load Ratio)', advice: 'Chỉ số hiệu quả năng lượng (PUE) đang bị suy giảm. Mức tiêu thụ hiện tại không tương xứng với phụ tải trung bình ngày. Cần rà soát lại toàn bộ SOP vận hành.' },
+            'roll_mean_3h': { name: 'Mặt bằng tải 3 giờ qua', advice: 'Nhu cầu điện năng trong 3 tiếng vừa rồi cao/thấp hơn hẳn quy luật. Cần đối chiếu ngay với lịch đặt phòng hoặc sự kiện của tòa nhà hôm nay.' },
+            'roll_std_3h': { name: 'Độ nhiễu/Dao động tải (3 giờ)', advice: 'Hệ thống điện không ổn định, máy móc bị đóng/cắt liên tục. Tình trạng này rất hại thiết bị. Cần đo kiểm sóng hài và tụ bù.' },
+            'roll_max_24h': { name: 'Chạm Đỉnh tải ngày (Peak)', advice: 'Tòa nhà đang chạy sát giới hạn công suất cực đại. Nguy cơ bị điện lực phạt tiền điện vượt Max Demand. Lập tức cắt giảm các phụ tải không ưu tiên.' },
+            'temp_roll_mean_6h': { name: 'Tích tụ nhiệt (6h qua)', advice: 'Hiện tượng Khối tích nhiệt (Thermal Mass). Nắng nóng gay gắt kéo dài 6 tiếng trước giờ mới ngấm xuyên qua vách kính vào nhà. Tải điều hòa sẽ phải chạy bù rất nặng.' },
+            'temp_roll_std_6h': { name: 'Biến động nhiệt (6h qua)', advice: 'Thời tiết thay đổi quá nhanh (nắng mưa thất thường). Cảm biến nhiệt tự động có thể bị "nhiễu". Cân nhắc chuyển HVAC sang chế độ vận hành thủ công bằng tay.' }
+        };
+
+        function translate(key) { 
+            if(dictFeature[key]) return dictFeature[key];
+            if(key.startsWith('load_lag_')) return { name: `Mức tải ${key.split('_')[2]} giờ trước`, advice: 'Kiểm tra lịch sử vận hành, có đóng/ngắt thiết bị nào trong khung giờ này không.' };
+            if(key.startsWith('load_diff_')) return { name: `Tốc độ đổi tải (${key.split('_')[2]}h)`, advice: 'Sự sốc tải đang xảy ra trong khung thời gian này, rà soát biến tần.' };
+            if(key.startsWith('temp_lag_')) return { name: `Nhiệt độ ${key.split('_')[2]} giờ trước`, advice: 'Độ trễ nhiệt từ bên ngoài đang ngấm vào hệ thống lạnh trong nhà.' };
+            return { name: key, advice: 'Hãy yêu cầu bộ phận bảo trì đo đạc thực tế thông số này trên hệ thống BMS.' }; 
+        }
+
+        // ================= KHỞI TẠO BIỂU ĐỒ =================
+        function initCharts() {
+            cRealtime = new Chart(document.getElementById('realtimeChart'), { type: 'line', data: { labels: [], datasets: [ { label: 'Thực tế', borderColor: '#0f172a', borderWidth: 2, data: [], pointRadius: 0, z: 10 }, { label: 'AI Dự báo', borderColor: '#3b82f6', borderDash: [5, 5], borderWidth: 2, data: [], pointRadius: 0 }, { label: 'Sự cố', backgroundColor: '#ef4444', pointStyle: 'rectRot', pointRadius: 8, data: [], type: 'scatter' }, { label: 'Ngưỡng dưới', data: [], borderColor: 'transparent', fill: false, pointRadius: 0 }, { label: 'Vùng An Toàn', data: [], borderColor: 'transparent', backgroundColor: 'rgba(16, 185, 129, 0.15)', fill: '-1', pointRadius: 0 } ]}, options: { responsive: true, maintainAspectRatio: false, animation: false, interaction: { mode: 'index', intersect: false } }});
+            cXai = new Chart(document.getElementById('xaiChart'), { type: 'bar', data: { labels: [], datasets: [{ label: '% Góp phần gây lỗi', backgroundColor: '#f59e0b', data: [] }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y' } });
+            cTemp = new Chart(document.getElementById('tempChart'), { type: 'line', data: { labels: [], datasets: [{ label: 'Nhiệt độ (°C)', borderColor: '#ef4444', data: [], pointRadius:0 }, { label: 'Độ ẩm sương', borderColor: '#38bdf8', data: [], pointRadius:0 }] }, options: { responsive: true, maintainAspectRatio: false, animation: false } });
+            cWind = new Chart(document.getElementById('windChart'), { type: 'line', data: { labels: [], datasets: [{ label: 'Tốc độ gió (m/s)', borderColor: '#8b5cf6', data: [], pointRadius:0, yAxisID: 'y1' }, { label: 'Áp suất (hPa)', borderColor: '#64748b', data: [], borderDash: [2,2], pointRadius:0, yAxisID: 'y2' }] }, options: { responsive: true, maintainAspectRatio: false, animation: false, scales: { y1: {position: 'left'}, y2: {position: 'right', grid:{drawOnChartArea:false}} } } });
+            cProfile = new Chart(document.getElementById('profileChart'), { type: 'bar', data: { labels: [], datasets: [{ label: 'Tải trung bình', backgroundColor: '#10b981', data: [] }] }, options: { responsive: true, maintainAspectRatio: false } });
+        }
+
+        // ================= TỰ ĐỘNG SINH INSIGHTS =================
+        function generateInsights(acData, wData, profileData) {
+            if (acData && acData.length >= 6) {
+                const current = acData[acData.length - 1]; const past = acData[acData.length - 6];
+                const diff = (((current - past) / past) * 100).toFixed(1);
+                const trend = current >= past ? `tăng <b>${diff}%</b>` : `giảm <b>${Math.abs(diff)}%</b>`;
+                const insightRt = document.getElementById('insight-realtime');
+                let text = `⚡ <b>Ghi nhận Hành vi:</b> So với 5 giờ trước, phụ tải đang ${trend}. `;
+                if (Math.abs(diff) > 15) {
+                    text += `Sự thay đổi biên độ gắt này cho thấy có việc đóng/ngắt hàng loạt thiết bị (khả năng cao do chuyển ca hoặc đổi kịch bản chạy). Khuyến nghị đội giám sát chú ý độ tiệm cận dải an toàn.`;
+                    insightRt.className = "chart-insight insight-red";
+                } else {
+                    text += `Biến thiên tải rất mềm mại. Hệ thống đang tuân thủ tuyệt đối theo hồ sơ vận hành tiêu chuẩn dự báo bởi AI.`;
+                    insightRt.className = "chart-insight insight-green";
+                }
+                insightRt.innerHTML = text;
+            }
+
+            if (wData && wData.length >= 25) {
+                const curTemp = wData[wData.length - 1].temp; const ydayTemp = wData[wData.length - 25].temp;
+                const diffT = (curTemp - ydayTemp).toFixed(1);
+                const insightTemp = document.getElementById('insight-temp');
+                let text = `🌡️ <b>Nền nhiệt hiện tại:</b> <b>${curTemp}°C</b> (lệch ${diffT > 0 ? '+'+diffT : diffT}°C so với cùng giờ hôm qua). `;
+                if (curTemp > 28) {
+                    text += `Nguy cơ sốc nhiệt tích lũy. Nắng nóng trực tiếp kích hoạt bơm nước và Chiller chạy đầy công suất. Hãy tính toán trễ nhiệt (Thermal lag) từ 2-4 giờ tới để chuẩn bị.`;
+                    insightTemp.className = "chart-insight insight-red";
+                } else {
+                    text += `Điều kiện vi khí hậu mát mẻ, đây là thời điểm lý tưởng để thiết lập chế độ chạy tiết kiệm (Eco-mode) cho hệ thống thông gió tòa nhà.`;
+                    insightTemp.className = "chart-insight insight-blue";
+                }
+                insightTemp.innerHTML = text;
+            }
+
+            if (wData && wData.length > 0) {
+                const curWind = wData[wData.length - 1].wind; const curPres = wData[wData.length - 1].pressure;
+                const insightWind = document.getElementById('insight-wind');
+                let text = `🌪️ <b>Động lực học:</b> Vận tốc gió <b>${curWind} m/s</b>, Khí áp <b>${curPres} hPa</b>. `;
+                if (curWind > 5) {
+                    text += `CẢNH BÁO: Tốc độ gió cao làm gia tăng hệ số truyền nhiệt đối lưu qua vách kính ngoài, gián tiếp làm tăng nặng tải làm mát/sưởi ấm.`;
+                    insightWind.className = "chart-insight insight-red";
+                } else {
+                    text += `Khí tượng quanh tòa nhà tĩnh lặng, không ghi nhận rủi ro thất thoát năng lượng do chênh lệch áp suất và đối lưu không khí.`;
+                    insightWind.className = "chart-insight insight-gray";
+                }
+                insightWind.innerHTML = text;
+            }
+
+            if (profileData && profileData.length > 0) {
+                let maxObj = profileData[0], minObj = profileData[0];
+                profileData.forEach(d => { if(d.avg_load > maxObj.avg_load) maxObj = d; if(d.avg_load < minObj.avg_load) minObj = d; });
+                document.getElementById('insight-profile').innerHTML = `🕒 <b>Chiến lược Vận hành:</b> Giờ cao điểm (Peak) luôn hội tụ cứng ở mốc <b>${maxObj.hour}</b> (${maxObj.avg_load.toFixed(1)} kWh). Đáy tải (Base load) rơi vào <b>${minObj.hour}</b>. Lịch bảo trì tĩnh nên dời vào khung giờ đáy để tránh sụt áp lưới điện.`;
+            }
+        }
+
+        // ================= VÒNG LẶP DỮ LIỆU & RENDER =================
+        function renderSidebar(filter = "") {
+            const list = document.getElementById('building-list'); list.innerHTML = '';
+            allBuildings.filter(b => b.toLowerCase().includes(filter.toLowerCase())).forEach(b => {
+                const item = document.createElement('div'); item.className = `b-item ${b === currentBuilding ? 'active' : ''}`; item.innerText = b;
+                item.onclick = () => { 
+                    currentBuilding = b; document.getElementById('building-title').innerText = b;
+                    renderSidebar(document.getElementById('search-input').value);
+                    fetchHistoricalProfile(); 
+                };
+                list.appendChild(item);
+            });
+        }
+
+        // TÍNH NĂNG CHUÔNG THÔNG BÁO FIX CHUẨN
+        async function fetchGlobalAlerts() {
+            try {
+                const alerts = await (await fetch(`${API_BASE}/alerts/global`)).json();
+                const listDiv = document.getElementById('alerts-list'); const badge = document.getElementById('alert-badge'); const bellIcon = document.getElementById('bell-icon');
+                let newCount = 0; listDiv.innerHTML = '';
+                alerts.forEach(a => {
+                    const id = `${a.timestamp}-${a.building}`;
+                    if(!notifiedAlerts.has(id)) { notifiedAlerts.add(id); newCount++; }
+                    
+                    const el = document.createElement('div'); 
+                    el.className = 'alert-item';
+                    el.innerHTML = `<div class="alert-title"><span style="color: var(--danger)">🚨 ${a.building}</span> <span style="font-size:11px;color:#64748b">${a.timestamp.split(" ")[1]}</span></div><div class="alert-desc">Sốc tải đo được: ${a.load.toFixed(1)} kWh</div>`;
+                    
+                    // XỬ LÝ SỰ KIỆN CLICK HOÀN HẢO
+                    el.onclick = () => { 
+                        currentBuilding = a.building; 
+                        document.getElementById('building-title').innerText = a.building;
+                        document.getElementById('alerts-panel').classList.remove('show'); 
+                        document.getElementById('search-input').value = '';
+                        renderSidebar(); 
+                        
+                        setTimeout(() => {
+                            const activeEl = document.querySelector('.b-item.active');
+                            if(activeEl) activeEl.scrollIntoView({behavior: 'smooth', block: 'center'});
+                        }, 50);
+
+                        fetchHistoricalProfile();
+                        fetchRealtimeLoop(); // Ép làm mới tức thì
+                    };
+                    listDiv.appendChild(el); 
+                });
+
+                if(newCount > 0) { badge.innerText = newCount; badge.classList.remove('hidden'); bellIcon.classList.add('ringing'); setTimeout(() => bellIcon.classList.remove('ringing'), 1000); } 
+                else if(alerts.length === 0) listDiv.innerHTML = `<div style="padding:20px;text-align:center;color:#94a3b8;font-size:12px;">Toàn bộ hệ thống an toàn.</div>`;
+            } catch(e) {}
+        }
+
+        async function fetchHistoricalProfile() {
+            if(!currentBuilding) return;
+            try {
+                const data = await (await fetch(`${API_BASE}/analytics/hourly_profile?building_name=${currentBuilding}`)).json();
+                cProfile.data.labels = data.map(d => d.hour); cProfile.data.datasets[0].data = data.map(d => d.avg_load); cProfile.update();
+                generateInsights(null, null, data);
+            } catch(e) {}
+        }
+
+        async function fetchRealtimeLoop() {
+            if(allBuildings.length === 0) {
+                try {
+                    allBuildings = await (await fetch(`${API_BASE}/buildings`)).json();
+                    if(allBuildings.length > 0) { currentBuilding = allBuildings[0]; document.getElementById('building-title').innerText = currentBuilding; fetchHistoricalProfile(); }
+                    renderSidebar();
+                } catch(e) { return; }
+            }
+            if(!currentBuilding) return;
+
+            try {
+                const data = await (await fetch(`${API_BASE}/data?building_name=${currentBuilding}&limit=${limit}`)).json();
+                const lb = [], ac = [], pr = [], an = [], up = [], lw = [];
+                if(data.length > 0) {
+                    data.forEach(d => { lb.push(d.timestamp.split(" ")[1]); ac.push(d.actual_load); pr.push(d.predicted_load); an.push(d.is_anomaly ? d.actual_load : null); up.push(d.predicted_load + d.threshold); lw.push(d.predicted_load - d.threshold); });
+                    cRealtime.data.labels = lb; cRealtime.data.datasets[0].data = ac; cRealtime.data.datasets[1].data = pr; cRealtime.data.datasets[2].data = an; cRealtime.data.datasets[3].data = lw; cRealtime.data.datasets[4].data = up; cRealtime.update();
+                    document.getElementById('time-display').innerText = `Cập nhật lúc: ${data[data.length-1].timestamp}`;
+                    document.getElementById('kpi-cur').innerText = data[data.length-1].actual_load.toFixed(1);
+                }
+
+                const s = await (await fetch(`${API_BASE}/stats/summary?building_name=${currentBuilding}`)).json();
+                document.getElementById('kpi-sum').innerText = s.sum.toFixed(1); document.getElementById('kpi-max').innerText = s.max.toFixed(1); document.getElementById('kpi-min').innerText = s.min.toFixed(1);
+
+                const x = await (await fetch(`${API_BASE}/explain?building_name=${currentBuilding}`)).json();
+                const xContent = document.getElementById('xai-content');
+                if(x.explanation) {
+                    const featuresRaw = Object.keys(x.explanation);
+                    const humanLabels = featuresRaw.map(k => translate(k).name); 
+                    xContent.innerHTML = `<div style="margin-bottom: 10px; color:#991b1b;">Sự cố bộc phát lúc <strong>${x.timestamp.split(" ")[1]}</strong>. AI phát hiện các nguyên nhân gốc rễ (Root-causes) sau:</div>`;
+                    cXai.data.labels = humanLabels; cXai.data.datasets[0].data = Object.values(x.explanation); cXai.update(); document.getElementById('xaiChart').style.display = 'block';
+                } else {
+                    xContent.innerHTML = `<div class="xai-empty">Tải tiêu thụ ngoan ngoãn bám sát mô hình dự báo của hệ thống máy học.</div>`;
+                    document.getElementById('xaiChart').style.display = 'none';
+                }
+
+                const wData = await (await fetch(`${API_BASE}/weather/correlation?building_name=${currentBuilding}&limit=168`)).json();
+                cTemp.data.labels = wData.map(w => w.time); cTemp.data.datasets[0].data = wData.map(w => w.temp); cTemp.data.datasets[1].data = wData.map(w => w.dew); cTemp.update();
+                cWind.data.labels = wData.map(w => w.time); cWind.data.datasets[0].data = wData.map(w => w.wind); cWind.data.datasets[1].data = wData.map(w => w.pressure); cWind.update();
+                
+                generateInsights(ac, wData, null); 
+            } catch(e) {}
+        }
+
+        // ================= MODAL LỊCH SỬ CHUYÊN SÂU =================
+        async function openHistoryModal() {
+            if(!currentBuilding) return;
+            document.getElementById('modal-title').innerText = `Nhật ký Cảnh báo An ninh Năng lượng - ${currentBuilding}`;
+            const modal = document.getElementById('history-modal'); const body = document.getElementById('modal-body');
+            modal.classList.add('show'); body.innerHTML = '<div style="text-align:center; padding: 40px; color: #64748b;">Đang trích xuất dữ liệu từ cơ sở dữ liệu phân tán...</div>';
+            try {
+                const history = await (await fetch(`${API_BASE}/alerts/history?building_name=${currentBuilding}`)).json();
+                if(history.length === 0) { body.innerHTML = '<div style="text-align:center; padding: 40px; color: #64748b;"><i>Tòa nhà này có lịch sử vận hành hoàn hảo. Không có rủi ro.</i></div>'; return; }
+                
+                let html = `<div style="margin-bottom:15px; color:#64748b; font-size: 13px;">Bấm vào từng sự cố để xem Camera trạng thái (Snapshot) và Lời khuyên của Chuyên gia AI.</div>
+                            <table class="history-table"><thead><tr><th>Thời điểm Ghi nhận</th><th>Tải Thực Tế</th><th>Ngưỡng AI Cho Phép</th><th>Xếp loại</th></tr></thead><tbody>`;
+                history.forEach((h, idx) => { html += `<tr onclick="showSnapshot(${idx})"><td>${h.timestamp}</td><td><b style="color:var(--danger)">${h.actual_load.toFixed(1)} kWh</b></td><td>${h.predicted_load.toFixed(1)} kWh</td><td style="color:#dc2626; font-weight:bold;">SỐC TẢI</td></tr>`; });
+                html += `</tbody></table>`; body.innerHTML = html; window.currentHistoryData = history; 
+            } catch(e) { body.innerHTML = 'Hệ thống gián đoạn khi truy xuất DB.'; }
+        }
+
+        window.showSnapshot = function(idx) {
+            const data = window.currentHistoryData[idx]; let actionHtml = '';
+            if(data.explanation) {
+                Object.keys(data.explanation).forEach(key => {
+                    const dict = translate(key); const val = data.explanation[key];
+                    actionHtml += `<div class="action-card"><div class="action-title">🔴 Yếu tố: ${dict.name} (Tỉ trọng gây lỗi: ${val}%)</div><div class="action-advice"><b>👩‍🔧 Chỉ đạo Kỹ thuật:</b> ${dict.advice}</div></div>`;
+                });
+            }
+            document.getElementById('modal-body').innerHTML = `
+                <button style="margin-bottom: 20px; padding: 8px 16px; cursor: pointer; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; font-weight: bold; color: #334155; transition: 0.2s;" onclick="openHistoryModal()">⬅ Quay về Danh sách Nhật ký</button>
+                <div class="snapshot-grid">
+                    <div class="snap-params">
+                        <h3 style="margin-top:0; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Đóng băng Trạng thái (Snapshot)</h3>
+                        <div class="param-item"><span>Thời khắc vỡ tuyến:</span> <b>${data.timestamp}</b></div>
+                        <div class="param-item"><span>Điện năng tiêu thụ thật:</span> <b style="color:var(--danger); font-size:18px;">${data.actual_load.toFixed(1)} kWh</b></div>
+                        <div class="param-item"><span>Công suất mô phỏng an toàn:</span> <b style="color:var(--primary)">${data.predicted_load.toFixed(1)} kWh</b></div>
+                        <hr style="border-top:1px dashed #cbd5e1; margin: 15px 0;">
+                        <h4 style="margin:0 0 10px 0; color: #64748b;">Đo đạc vi khí hậu tại thời điểm đó:</h4>
+                        <div class="param-item"><span>🌡️ Nhiệt độ:</span> <b>${data.temp}°C</b></div>
+                        <div class="param-item"><span>💧 Ẩm độ:</span> <b>${data.dew}°C</b></div>
+                        <div class="param-item"><span>🌪️ Sức gió:</span> <b>${data.wind} m/s</b></div>
+                    </div>
+                    <div class="snap-actions">
+                        <h3 style="margin-top:0; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px;">Truy vết Nguyên nhân & Lệnh Điều phối</h3>
+                        ${actionHtml || '<i style="color:#64748b;">Không có đủ dấu vết ngoại cảnh để hệ chuyên gia kết luận. Hãy kiểm tra các tác động cơ học trực tiếp (chập điện, cháy nổ).</i>'}
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- KHỞI CHẠY ---
+        window.onload = () => {
+            initCharts();
+            document.querySelectorAll('.btn-time').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.btn-time').forEach(b => b.classList.remove('active')); e.target.classList.add('active'); limit = parseInt(e.target.getAttribute('data-val')); fetchRealtimeLoop();
+                });
+            });
+            document.getElementById('search-input').addEventListener('input', (e) => renderSidebar(e.target.value));
+            
+            const bell = document.getElementById('bell-btn'); const panel = document.getElementById('alerts-panel');
+            bell.addEventListener('click', (e) => { panel.classList.toggle('show'); document.getElementById('alert-badge').classList.add('hidden'); });
+            document.getElementById('btn-clear').addEventListener('click', (e) => { e.stopPropagation(); notifiedAlerts.clear(); document.getElementById('alerts-list').innerHTML = ''; document.getElementById('alert-badge').classList.add('hidden'); });
+            
+            document.getElementById('btn-show-history').addEventListener('click', openHistoryModal);
+            document.getElementById('btn-close-modal').addEventListener('click', () => document.getElementById('history-modal').classList.remove('show'));
+
+            setInterval(fetchRealtimeLoop, 500); setInterval(fetchGlobalAlerts, 2000);
+        };
+    </script>
+</body>
+</html>
