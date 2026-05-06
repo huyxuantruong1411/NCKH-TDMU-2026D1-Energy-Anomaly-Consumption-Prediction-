@@ -3,6 +3,7 @@ import json
 import xgboost as xgb
 import numpy as np
 from collections import deque, defaultdict
+from sklearn.cluster import KMeans # [THÊM MỚI] Import K-Means cho phương pháp Hybrid
 
 class AnomalyDetector:
     def __init__(self):
@@ -32,11 +33,28 @@ class AnomalyDetector:
         if len(history) < 24: 
             anomaly_threshold = actual_load * 0.1 
         else:
+            # =================================================================
+            # ÁP DỤNG PHƯƠNG PHÁP MỚI: HYBRID K-MEANS + IQR
+            # =================================================================
+            
+            # 1. Phương pháp Cơ sở (Baseline: Statistical IQR Only)
             q75, q25 = np.percentile(history, [75, 25])
             iqr = q75 - q25
             median_res = np.median(history)
-            dynamic_threshold = median_res + (self.k_factor * iqr)
+            tau_stat = median_res + (self.k_factor * iqr)
+            
+            # 2. Phương pháp Đề xuất (Proposed: K-Means Offset)
+            res_2d = np.array(history).reshape(-1, 1)
+            kmeans = KMeans(n_clusters=2, random_state=42, n_init=10)
+            kmeans.fit(res_2d)
+            tau_kmeans = float(np.max(kmeans.cluster_centers_))
+            
+            # 3. Giao thoa ngưỡng (Hybrid Threshold)
+            dynamic_threshold = max(tau_stat, tau_kmeans)
+            
+            # Đảm bảo ngưỡng không nhỏ hơn 10% tải thực tế để tránh nhiễu vi mô
             anomaly_threshold = max(dynamic_threshold, actual_load * 0.1)
+            # =================================================================
         
         is_anomaly = 1 if error > anomaly_threshold else 0
         
@@ -55,7 +73,7 @@ class AnomalyDetector:
                 percent_change = ((current[idx] - baseline[idx]) / (abs(baseline[idx]) + 1e-5)) * 100
                 explanation_data[feat_name] = round(percent_change, 2)
                 count += 1
-                if count >= 5: break # [FIX] Trích xuất 5 độ đo lớn nhất
+                if count >= 5: break
             explanation_json = json.dumps(explanation_data)
 
         temp, dew, wind, pressure = 0.0, 0.0, 0.0, 0.0

@@ -23,5 +23,20 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
 
+  # [THÊM MỚI] Khởi tạo Database PostgreSQL bằng Docker
+  postgres_db:
+    image: postgres:13
+    container_name: energy_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 14112002
+      POSTGRES_DB: energy_db
+    ports:
+      - "5433:5432" # Map ra host port 5433 để tránh trùng lặp
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
 volumes:
   kafka_data:
+  pg_data: # Volume giữ liệu DB không bị mất khi tắt Docker

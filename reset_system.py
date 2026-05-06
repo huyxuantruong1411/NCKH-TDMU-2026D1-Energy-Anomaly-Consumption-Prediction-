@@ -3,7 +3,8 @@ from sqlalchemy import create_engine, text
 from kafka.admin import KafkaAdminClient
 from kafka.errors import UnknownTopicOrPartitionError
 
-DATABASE_URL = "postgresql://postgres:14112002@localhost:5432/energy_db"
+# Đã đổi port sang 5433
+DATABASE_URL = "postgresql://postgres:14112002@localhost:5433/energy_db"
 KAFKA_BROKER = "localhost:29092"
 TOPIC_NAME = "energy_stream"
 
